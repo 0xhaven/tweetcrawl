@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/jacobhaven/tweetcrawl/lib/store"
 )
@@ -21,7 +22,7 @@ func NewRouter(store store.Store) http.Handler {
 		Handler: mux,
 		store: store,
 	}
-	mux.HandleFunc("/count", rt.countHandler)
+	mux.HandleFunc("/info", rt.countHandler)
 	mux.HandleFunc("/hashtags", rt.topHashtags)
 	mux.HandleFunc("/domains", rt.topDomains)
 	mux.HandleFunc("/emoji", rt.topEmoji)
@@ -36,9 +37,37 @@ func handleErr(w http.ResponseWriter, err error) {
 }
 
 func (rt *router) countHandler(w http.ResponseWriter, r *http.Request) {
+	var infoResp struct {
+		Count int
+		Duration string
+		RatePerSecond float64
+		PercentHashtag float64
+		PercentURL float64
+		PercentImageURL float64
+		PercentEmoji float64
+	}
+
 	count, err := rt.store.Count()
 	handleErr(w, err)
-	handleErr(w, json.NewEncoder(w).Encode(struct{Count int}{count}))
+	duration, err := rt.store.Duration()
+	handleErr(w, err)
+	hashtagCount, err := rt.store.NumWithHashtags()
+	handleErr(w, err)
+	urlCount, err := rt.store.NumWithURLs()
+	handleErr(w, err)
+	imageCount, err := rt.store.NumWithPhotoURLs()
+	handleErr(w, err)
+	emojiCount, err := rt.store.NumWithEmoji()
+	handleErr(w, err)
+
+	infoResp.Count = count
+	infoResp.Duration = duration.String()
+	infoResp.RatePerSecond = float64(count) / float64(duration/time.Second)
+	infoResp.PercentHashtag = float64(hashtagCount)/float64(count)
+	infoResp.PercentURL = float64(urlCount)/float64(count)
+	infoResp.PercentImageURL = float64(imageCount)/float64(count)
+	infoResp.PercentEmoji = float64(emojiCount)/float64(count)
+	handleErr(w, json.NewEncoder(w).Encode(infoResp))
 }
 
 func parseCount(val string) int {

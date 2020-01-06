@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"net/url"
+	"time"
 
 	"github.com/jacobhaven/tweetcrawl/lib/twitter"
 
@@ -17,7 +18,15 @@ type Item struct {
 
 type Store interface {
 	Save(twitter.Tweet) error
+
 	Count() (int, error)
+	Duration() (time.Duration, error)
+
+	NumWithHashtags() (int, error)
+	NumWithURLs() (int, error)
+	NumWithPhotoURLs() (int, error)
+	NumWithEmoji() (int, error)
+
 	TopHashtags(int) ([]Item, error)
 	TopDomains(int) ([]Item, error)
 	TopEmoji(int) ([]Item, error)
@@ -96,6 +105,43 @@ func (store *sqlStore) Save(in twitter.Tweet) error {
 func (store *sqlStore) Count() (int, error) {
 	var count int
 	store.db.Model(tweet{}).Count(&count)
+	return count, store.db.Error
+}
+
+func (store *sqlStore) Duration() (time.Duration, error) {
+	var oldest, newest tweet
+	store.db.Order("created_at ASC").First(&oldest)
+	store.db.Order("created_at DESC").First(&newest)
+	return newest.CreatedAt.Sub(oldest.CreatedAt), store.db.Error
+}
+
+func (store *sqlStore) NumWithHashtags() (int, error) {
+	var count int
+	store.db.Model(hashtag{}).Group("tweet_id").Count(&count)
+	return count, store.db.Error
+}
+
+func (store *sqlStore) NumWithURLs() (int, error) {
+	var count int
+	store.db.Model(domain{}).Group("tweet_id").Count(&count)
+	return count, store.db.Error
+}
+
+func (store *sqlStore) NumWithPhotoURLs() (int, error) {
+	photoDomains := []string{
+		"pic.twitter.com",
+		"pbs.twimg.com",
+		"www.instagram.com",
+	}
+	var count int
+	store.db.Model(domain{}).Group("tweet_id").Where("domain IN (?)",
+		photoDomains).Count(&count)
+	return count, store.db.Error
+}
+
+func (store *sqlStore) NumWithEmoji() (int, error) {
+	var count int
+	store.db.Model(emoji{}).Group("tweet_id").Count(&count)
 	return count, store.db.Error
 }
 
