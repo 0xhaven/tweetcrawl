@@ -1,11 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"net/http"
 	"os"
-	"time"
 
+	"github.com/jacobhaven/tweetcrawl/lib/api"
 	"github.com/jacobhaven/tweetcrawl/lib/store"
 	"github.com/jacobhaven/tweetcrawl/lib/twitter"
 
@@ -49,39 +49,9 @@ func main() {
 		}()
 	}
 
-	time.Sleep(10*time.Second)
-	if err := sampler.Close(); err != nil {
+	const addr = ":8080"
+	log.Printf("Listing on %s\n", addr)
+	if err := http.ListenAndServe(addr, api.NewRouter(store)); err != nil {
 		log.Fatal(err)
-	}
-
-	count, err := store.Count()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	hashtags, err := store.TopHashtags(5)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	domains, err := store.TopDomains(7)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	emoji, err := store.TopEmoji(10)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(count)
-	for _, item := range hashtags {
-		fmt.Println(item.Count, item.Name)
-	}
-	for _, item := range domains {
-		fmt.Println(item.Count, item.Name)
-	}
-	for _, item := range emoji {
-		fmt.Println(item.Count, item.Name)
 	}
 }
